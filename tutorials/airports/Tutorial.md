@@ -61,7 +61,7 @@
           "keys": ["origin", "destination"], "as": ["_source", "_target"]
         },
         { "type": "filter", "test": "datum._source && datum._target" },
-        { "type": "linkpath" },
+        { "type": "linkpath", "shape": "line" },
         { "type": "filter", "test": "hover && hover.iata == datum.origin" }
       ]
     }
@@ -1586,7 +1586,7 @@ Here we simply replace `symbol:` with `@cell:`. The `@name` pattern selects only
           "keys": ["origin", "destination"], "as": ["_source", "_target"]
         },
         { "type": "filter", "test": "datum._source && datum._target" },
-        { "type": "linkpath" },
+        { "type": "linkpath", "shape": "line" },
         { "type": "filter", "test": "hover && hover.iata == datum.origin" }
       ]
     }
