@@ -1,0 +1,73 @@
+body {
+  max-width: 900px;
+  margin: 0 auto;
+  font-family: Helvetica Neue;
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+a, a:visited {
+  color: #4078c0;
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+p, pre, h1, h2, h3, h4, h5, h6 {
+  max-width: 700px;
+}
+
+h2 {
+  margin-top: 1.5em;
+  border-bottom: 1px solid #dedede;
+}
+
+h3 {
+  margin-bottom: -0.5em;
+}
+
+div.vega {
+  border-top: 1px dashed #dedede;
+  border-bottom: 1px dashed #dedede;
+  padding: 0.2em 0;
+}
+
+code {
+  font-family: Consolas, "Liberation Mono", Menlo, Courier, monospace;
+  background-color: #f7f7f7;
+  border-radius: 3px;
+  padding: 0.2em 0.3em;
+  margin: 0;
+  font-size: 85%;
+}
+
+pre {
+  line-height: 19.7px; /*1.45;*/
+  padding: 10px;
+  overflow: auto;
+  background-color: #f7f7f7;
+  border-radius: 3px;
+}
+
+pre > code {
+  padding: 0;
+  background-color: transparent;
+  border-radius: none;
+}
+
+.vega-component .vega-actions {
+  font-weight: 300;
+  text-align: right;
+  font-size: 12px;
+}
+
+.vega-component .vega-actions a {
+  margin-left: 1em;
+  visibility: hidden;
+}
+
+.vega-component:hover .vega-actions a {
+  visibility: visible;
+}
