@@ -41,12 +41,30 @@ var vega = function(converter) {
 };
 
 function vega_invoke(id, markdown) {
+  // setup params -> signals.
+  var lines = markdown.trim().split(/\r?\n/),
+      args  = lines[0],
+      i, len, a, params = [];
+
+  if (args[0] === '(') {
+    args = lines.shift()
+      .replace(/[\(\)]/g, '')
+      .split(',');
+
+    for(i=0, len=args.length; i<len; ++i) {
+      a = args[i].trim().split(/[\s=]/);
+      params.push({ type: a[0], name: a[1], value: a[2] });
+    }
+  }
+
   // map vega spec / filename to JS string
-  var arg = markdown.trim()
+  var spec = lines.join('\n')
     .replace(/'/g, '\\\'')
     .replace(/\n/g, '\\n');
+
   // add call to create new vega component
-  return 'vg.component(\'#' + id + '\', \'' + arg + '\')';
+  return 'vg.component(\'#' + id + '\', \'' + spec +
+    '\', \'' + JSON.stringify(params) + '\')';
 }
 
 module.exports = vega;

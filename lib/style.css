@@ -1,6 +1,7 @@
 body {
   max-width: 900px;
   margin: 0 auto;
+  position: relative;
   font-family: Helvetica Neue;
   font-size: 16px;
   line-height: 1.6;
@@ -70,4 +71,20 @@ pre > code {
 
 .vega-component:hover .vega-actions a {
   visibility: visible;
+}
+
+.aside {
+  font-size: small;
+  right: 0;
+  position: absolute;
+  width: 180px;
+  z-index: 1;
+}
+
+.vega-component .aside {
+  background: rgba(255, 255, 255, 0.75);
+  border: 1px dashed #dedede;
+  border-radius: 5px;
+  box-shadow: 2px 2px 10px #dedede;
+  padding: 0 10px;
 }
