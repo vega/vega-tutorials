@@ -299,7 +299,7 @@ Once we've generated outline paths for each state, plotting them is straightforw
 
 Here we add a definition for a `path` mark to the `marks` array. We use the `layout_path` property for the path outline, set the `fill` color to light grey, and set the `stroke` color to white.
 
-```!vega
+```!vega(num[0-3600] scale=1200, num[0-900] cx=450, num[0-560] cy=280)
 {
   "width": 900,
   "height": 560,
@@ -313,7 +313,7 @@ Here we add a definition for a `path` mark to the `marks` array. We use the `lay
       "transform": [
         {
           "type": "geopath", "projection": "albersUsa",
-          "scale": 1200, "translate": [450, 280]
+          "scale": {"signal": "scale"}, "translate": [{"signal": "cx"}, {"signal": "cy"}]
         }
       ]
     }
@@ -327,7 +327,7 @@ Here we add a definition for a `path` mark to the `marks` array. We use the `lay
       "type": "path",
       "from": {"data": "states"},
       "properties": {
-        "enter": {
+        "update": {
           "path": {"field": "layout_path"},
           "fill": {"value": "#dedede"},
           "stroke": {"value": "white"}
