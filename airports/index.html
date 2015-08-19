@@ -1,0 +1,578 @@
+<!DOCTYPE html><html><head><title>Vega Tutorial: Airports</title><link rel="stylesheet" href="../style.css"><link rel="stylesheet" href="../highlight.css"><script src="http://vega.github.io/vega-editor/vendor/topojson.js" charset="utf-8"></script><script src="http://vega.github.io/vega-editor/vendor/d3.min.js" charset="utf-8"></script><script src="http://vega.github.io/vega-editor/vendor/d3.geo.projection.min.js" charset="utf-8"></script><script src="http://vega.github.io/vega-editor/vendor/d3.layout.cloud.js" charset="utf-8"></script><script src="http://vega.github.io/vega-editor/vendor/vega.min.js" charset="utf-8"></script><script src="http://vega.github.io/vega-editor/vendor/vega-embed.min.js" charset="utf-8"></script><script src="../highlight.min.js"></script><script>hljs.initHighlightingOnLoad();</script><script>vg.embed.config.source_header = '\<link rel="stylesheet" href="../highlight.css"\>\<script src="../highlight.min.js"\>\</script\>';vg.embed.config.source_footer = '\<script\>hljs.initHighlighting();\</script\>';</script></head><body><h1 id="mappingairportconnections">Mapping Airport Connections</h1>
+
+<div id="vega_vis_0"></div>
+
+<p>From massive hubs to small local outposts, the United States air traffic system consists of a rich set of connections among hundeds of airports. In this tutorial, we will visualize this system of airports and connections, based on data from the year 2008. Our goal will be to create our own version of <a href="https://mbostock.github.io/d3/talk/20111116/airports.html">Mike Bostock's D3.js airports map</a>.</p>
+
+<p>In the process, we will touch upon many of the features supported by Vega: transforming data, combining multiple data sets, handling user input, mapping geographic data, and plotting both tabular and network data. As you work through the tutorial, we highly encourage you to build up and experiment with each step in the <a href="http://vega.github.io/vega-editor">online Vega Editor</a>.</p>
+
+<h2 id="step1meetthedata">Step 1: Meet the Data</h2>
+
+<p>Let's begin by examining our raw ingredients. We will build the visualization from three data sets; each resides in the <code>data</code> subfolder and are available within the <a href="http://vega.github.io/vega-editor">Vega Editor</a>.</p>
+
+<p><strong><a href="data/us-10m.json">us-10m.json</a></strong></p>
+
+<p>This is a <a href="https://github.com/mbostock/topojson">TopoJSON</a> file that contains the boundaries of U.S. states at a scale of 1:10,000,000. We will use this file to draw a map of U.S. states as the base layer of our visualization. If you are interested in generating your own TopoJSON data, check out the <a href="https://github.com/mbostock/us-atlas">U.S. Atlas TopoJSON tools</a>.</p>
+
+<p><strong><a href="data/airports.csv">airports.csv</a></strong></p>
+
+<p>This data set contains a list of U.S. airports in CSV (comma-separated value) format. The first column (<code>iata</code>) contains a unique identifier provided by the International Air Transport Association. Subsequent columns describe the name and location of the airport, including <code>latitude</code> and <code>longitude</code> coordinates. We will use these coordinates to plot the airports.</p>
+
+<pre><code class="csv language-csv">iata,name,city,state,country,latitude,longitude
+00M,Thigpen,Bay Springs,MS,USA,31.95376472,-89.23450472
+00R,Livingston Municipal,Livingston,TX,USA,30.68586111,-95.01792778
+00V,Meadow Lake,Colorado Springs,CO,USA,38.94574889,-104.5698933
+01G,Perry-Warsaw,Perry,NY,USA,42.74134667,-78.05208056
+</code></pre>
+
+<p><strong><a href="data/airports.csv">flights-airport.csv</a></strong></p>
+
+<p>This data set contains flight information for the year 2008. Each record consists of an <code>origin</code> airport (identified by IATA id), a <code>destination</code> airport, and the <code>count</code> of flights along this route. We will use this dataset to compute per-airport traffic and to plot connections among airports.</p>
+
+<pre><code class="csv language-csv">origin,destination,count
+ABE,ATL,853
+ABE,BHM,1
+ABE,CLE,805
+ABE,CLT,465
+</code></pre>
+
+<h2 id="step2visualizationscaffolding">Step 2: Visualization Scaffolding</h2>
+
+<p>Now let's get started building our visualization! We begin with a basic scaffold:</p>
+
+<pre><code class="json language-json">{
+  "width": 900,
+  "height": 560,
+  "padding": {"top": 0, "left": 0, "right": 0, "bottom": 0},
+  "data": [],
+  "scales": [],
+  "signals": [],
+  "marks": []
+}
+</code></pre>
+
+<p>We first set the width (<code>900</code> pixels) and height (<code>560</code> pixels) of the view, and initially set the padding to zero (we will adjust this later on). We also include empty arrays for:</p>
+
+<ul>
+<li><code>data</code> - to load and transform data sets</li>
+
+<li><code>scales</code> - to map data values to visual variables</li>
+
+<li><code>signals</code> - for variables that can dynamically react to user input</li>
+
+<li><code>marks</code> - for graphical elements that visualize data</li>
+</ul>
+
+<p>We will fill in each of these aspects as we progress.</p>
+
+<h2 id="step3drawausstatemap">Step 3: Draw a U.S. State Map</h2>
+
+<p>Now that we have a basic setup, let's add a U.S. state map as the background layer of our visualization. This requires two steps: preparing the data and drawing the map.</p>
+
+<h3 id="loadtopojsondata">Load TopoJSON Data</h3>
+
+<p>To load the geographic data, we add an entry to the <code>data</code> array:</p>
+
+<pre><code class="json language-json">"data": [
+  {
+    "name": "states",
+    "url": "data/us-10m.json",
+    "format": {"type": "topojson", "feature": "states"}
+  }
+],
+</code></pre>
+
+<p>This entry defines a new dataset named <code>states</code>, and loads it from the provided URL. We use the <code>format</code> property to indicate that this is <code>topojson</code> data and that we wish to use the feature named <code>states</code>. TopoJSON files may include any number of arbitrarily-named features; <code>us-10m.json</code> includes the features <code>states</code> and <code>counties</code>.</p>
+
+<p>We can now load the data, and Vega unpacks the requested feature into a collection of latitude and longitude coordinates in <a href="http://geojson.org/">GeoJSON</a> format. To visualize the states, we will want to pick a cartographic projection to map from (longitude, latitude) coordinates to (x, y) coordinates, and then generate outline paths for each state. To do so, we use Vega's <code>geopath</code> transform.</p>
+
+<pre><code class="json language-json">"data": [
+  {
+    "name": "states",
+    "url": "data/us-10m.json",
+    "format": {"type": "topojson", "feature": "states"},
+    "transform": [
+      {
+        "type": "geopath", "projection": "albersUsa",
+        "scale": 1200, "translate": [450, 280]
+      }
+    ]
+  }
+],
+</code></pre>
+
+<p>Here the <code>geopath</code> transform uses the <code>albersUsa</code> map projection. While a number of projections might be reasonable choices, the <a href="https://en.wikipedia.org/wiki/Albers_projection">Albers projection</a> preserves area, and the special <code>albersUsa</code> version distorts geography to place Alaska and Hawaii in convenient viewing locations, which will allow us to better see flights originating in those states. For each state, the <code>geopath</code> transform sets a <code>layout_path</code> property that contains the projected state outlines as <a href="https://developer.mozilla.org/en-US/docs/Web/SVG/Tutorial/Paths">SVG path strings</a>.</p>
+
+<p>Here we also supply <code>scale</code> and <code>translate</code> parameters to the <code>geopath</code> transform. These settings determine the zoom level of the map and position the projection at the center of the visualization &ndash; <code>[450, 280]</code> is the view width and height divided by 2. The <code>geopath</code> transform supports a <a href="https://github.com/vega/vega/wiki/Data-Transforms#-geopath">number of projection types and parameters</a>. If you are feeling adventurous, try experimenting with changing the map projection, adjusting the projection parameters, and modifying the visualization size.</p>
+
+<h3 id="drawstateboundaries">Draw State Boundaries</h3>
+
+<p>Once we've generated outline paths for each state, plotting them is straightforward:</p>
+
+<pre><code class="json language-json">"marks": [
+  {
+    "type": "path",
+    "from": {"data": "states"},
+    "properties": {
+      "enter": {
+        "path": {"field": "layout_path"},
+        "fill": {"value": "#dedede"},
+        "stroke": {"value": "white"}
+      }
+    }
+  }
+]
+</code></pre>
+
+<p>Here we add a definition for a <code>path</code> mark to the <code>marks</code> array. We use the <code>layout_path</code> property for the path outline, set the <code>fill</code> color to light grey, and set the <code>stroke</code> color to white.</p>
+
+<div id="vega_vis_1"></div>
+
+<p>Et voil&agrave;! Our visualization now contains a base map.</p>
+
+<h2 id="step4plotalltheairports">Step 4: Plot All the Airports</h2>
+
+<p>Now we can plot the airports over our map. We can load the airport data by adding a new <code>airports</code> entry to the end of the <code>data</code> array:</p>
+
+<pre><code class="json language-json">{
+  "name": "airports",
+  "url": "data/airports.csv",
+  "format": {"type": "csv", "parse": "auto"}
+}
+</code></pre>
+
+<p>Here we use the <code>format</code> property to indicate that this is <code>csv</code> data and that we should <code>auto</code> parse the data values. Vega will automatically try to determine which columns are numbers, which are strings, and so on.</p>
+
+<p>To plot the data, we then need to project the <code>longitude</code> and <code>latitude</code> variables to x, y coordinates. Here we use the <code>geo</code> transform with projection settings identical to our earlier <code>geopath</code> transform:</p>
+
+<pre><code class="json language-json">{
+  "name": "airports",
+  "url": "data/airports.csv",
+  "format": {"type": "csv", "parse": "auto"},
+  "transform": [
+    {
+      "type": "geo", "projection": "albersUsa",
+      "scale": 1200, "translate": [450, 280],
+      "lon": "longitude", "lat": "latitude"
+    },
+    {
+      "type": "filter",
+      "test": "datum.layout_x != null &amp;&amp; datum.layout_y != null"
+    }
+  ]
+}
+</code></pre>
+
+<p>In addition, we add a <code>filter</code> transfrom to remove any data points with null coordinates. In this case, airports outside the 50 states and Washington D.C. (such as those in U.S. territories) are not supported by the <code>albersUsa</code> projection. The projection returns <code>null</code> x and y values for those airports.</p>
+
+<p>To visualize the airports, we add a new <code>symbol</code> mark entry to the <code>marks</code> array:</p>
+
+<pre><code class="json language-json">{
+  "type": "symbol",
+  "from": {"data": "airports"},
+  "properties": {
+    "enter": {
+      "x": {"field": "layout_x"},
+      "y": {"field": "layout_y"},
+      "size": {"value": 16},
+      "fill": {"value": "steelblue"},
+      "fillOpacity": {"value": 0.8},
+      "stroke": {"value": "white"},
+      "strokeWidth": {"value": 0.5}
+    }
+  }
+}
+</code></pre>
+
+<p>The symbol mark type defaults to circles if no <code>shape</code> property is provided. We position each airport according to the <code>layout_x</code> and <code>layout_y</code> coordinates generated by the <code>geo</code> transform. We also set a number of constant values for the size, fill and stroke.</p>
+
+<div id="vega_vis_2"></div>
+
+<p>The result is a map of all airports in the United States. That's a lot of airports!</p>
+
+<h2 id="step5filtertheairportsbytraffic">Step 5: Filter the Airports by Traffic</h2>
+
+<p>We'd now like to visualize more information about the airports. How much traffic does each airport get in 2008? In the process, we can also filter out those airports that did not service any commercial flights in 2008. To incorporate this information, we need to load the flights data.</p>
+
+<p>We can add the following entry to the the <code>data</code> array, <em>before</em> the <code>airports</code> data:</p>
+
+<pre><code class="json language-json">{
+  "name": "traffic",
+  "url": "data/flights-airport.csv",
+  "format": {"type": "csv", "parse": "auto"},
+  "transform": [
+    {
+      "type": "aggregate", "groupby": ["origin"],
+      "summarize": [{"field": "count", "ops": ["sum"], "as": ["flights"]}]
+    }
+  ]
+}
+</code></pre>
+
+<p>We load the data and parse the CSV file. We then use an <code>aggregate</code> transform to count the total number of flights originating at each airport. The resulting <code>traffic</code> dataset is a table with two variables: an <code>origin</code> airport and the total count of <code>flights</code> that departed that airport.</p>
+
+<p>Now that we have a measure of per-airport traffic, we would like to combine (or in database terms <em>join</em>) this data with our original airports data. To do this, we use Vega's <code>lookup</code> transform. This transform looks for specified key values of a primary dataset within a secondary dataset, and if found adds the matched data record as a new property of the primary data.</p>
+
+<pre><code class="json language-json">{
+  "name": "airports",
+  "url": "data/airports.csv",
+  "format": {"type": "csv", "parse": "auto"},
+  "transform": [
+    {
+      "type": "lookup", "on": "traffic", "onKey": "origin",
+      "keys": ["iata"], "as": ["traffic"]
+    },
+    {
+      "type": "geo", "projection": "albersUsa",
+      "lon": "longitude", "lat": "latitude"
+    },
+    {
+      "type": "filter",
+      "test": "datum.traffic &amp;&amp; datum.layout_x != null &amp;&amp; datum.layout_y != null"
+    }
+  ]
+}
+</code></pre>
+
+<p>Here the <code>airports</code> data is our primary dataset and the <code>traffic</code> data is used as the lookup table. For each airport, we look for a record in the traffic data whose <code>origin</code> property matches the <code>iata</code> property of the airport. If a match is found, we add the traffic record to the airport data under a property named <code>traffic</code>.</p>
+
+<p>We also update our <code>filter</code> transform to remove airports for which we fail to find a match in the traffic dataset (indicated by a <code>null</code> value). This step filters out all the airports for which we observe no originating flights in 2008.</p>
+
+<div id="vega_vis_3"></div>
+
+<p>We now see only those airports that are included in the <code>flights-airport.csv</code> data.</p>
+
+<h2 id="step6sizetheairportsbytraffic">Step 6: Size the Airports by Traffic</h2>
+
+<p>We can also use the traffic data to size each airport based on the number of originating flights. We first add an entry to the <code>scales</code> array to map from traffic to circular area:</p>
+
+<pre><code class="json language-json">"scales": [
+  {
+    "name": "size",
+    "type": "linear",
+    "domain": {"data": "traffic", "field": "flights"},
+    "range": [16, 1000]
+  }
+],
+</code></pre>
+
+<p>Here we define a linear scale that maps from the <code>domain</code> of flight counts to a <code>range</code> of <code>[16, 1000]</code> pixels. At this point, you might be thinking: "Why a linear scale? If we map that to the radius of a circle we will exaggerate the area and mislead our viewers!" And you would of course be correct! However, in this case we will be setting the <code>size</code> parameter of our <code>symbol</code> marks, which sets the <em>area</em>, not the <em>radius</em>, of the symbol.</p>
+
+<pre><code class="json language-json">{
+  "type": "symbol",
+  "from": {"data": "airports"},
+  "properties": {
+    "enter": {
+      "x": {"field": "layout_x"},
+      "y": {"field": "layout_y"},
+      "size": {"scale": "size", "field": "traffic.flights"},
+      "fill": {"value": "steelblue"},
+      "fillOpacity": {"value": 0.8},
+      "stroke": {"value": "white"},
+      "strokeWidth": {"value": 1.5}
+    }
+  }
+}
+</code></pre>
+
+<p>Here we modify our airport <code>symbol</code> marks. The <code>size</code> property is now set by running <code>traffic.flights</code> through our new scale. We also set <code>fillOpacity</code> to create a transparency effect and increase the <code>strokeWidth</code>.</p>
+
+<div id="vega_vis_4"></div>
+
+<p>We can now see the massive hubs, the local outposts, and everything in-between!</p>
+
+<h2 id="step7showairportnameonmousehover">Step 7: Show Airport Name on Mouse Hover</h2>
+
+<p>While we can see differences between airports, it would be nice to see their names, too. We will now add interactions to show the airport name and IATA id upon mouse hover. To do so, we add two entries to the <code>signals</code> array:</p>
+
+<pre><code class="json language-json">"signals": [
+  {
+    "name": "hover", "init": null,
+    "streams": [
+      {"type": "symbol:mouseover", "expr": "datum"},
+      {"type": "symbol:mouseout", "expr": "null"}
+    ]
+  },
+  {
+    "name": "title", "init": "U.S. Airports, 2008",
+    "streams": [{
+      "type": "hover", 
+      "expr": "hover ? hover.name + ' (' + hover.iata + ')' : 'U.S. Airports, 2008'"
+    }]
+  }
+]
+</code></pre>
+
+<p><em>Signals</em> are variables that can change dynamically in response to user input. Each signal consists of a name, an initial value, and an optional set of one or more update rules. The update rules are defined as a set of <code>streams</code> handlers with a <code>type</code> (which may monitor input event patterns or other signals) and an expression (<code>expr</code>) to evaluate when events occur.</p>
+
+<p>The <code>hover</code> signal contains the current airport record (or <code>datum</code>) under the mouse cursor, or <code>null</code> if no airport is being hovered over. The <code>streams</code> entries state that upon <code>mousover</code> of a <code>symbol</code> mark, set the signal value to the current <code>datum</code>. Upon a <code>mouseout</code> event, set the signal value to <code>null</code>. In short, this signal tracks the data of the currently hovered symbol.</p>
+
+<p>The <code>title</code> signal contains a string describing the currently hovered airport, or a generic title string if no airport is selected. The <code>streams</code> entry responds to changes in the <code>hover</code> signal, producing a string containing the airport <code>name</code> and <code>iata</code> id if the <code>hover</code> data point is defined.</p>
+
+<p>To show this information, we add a new <code>text</code> mark entry to the end of the <code>marks</code> array:</p>
+
+<pre><code class="json language-json">{
+  "type": "text",
+  "interactive": false,
+  "properties": {
+    "enter": {
+      "x": {"value": 895},
+      "y": {"value": 0},
+      "fill": {"value": "black"},
+      "fontSize": {"value": 20},
+      "align": {"value": "right"}
+    },
+    "update": {
+      "text": {"signal": "title"}
+    }
+  }
+}
+</code></pre>
+
+<p>Note that this text mark definition does not have a <code>from</code> property indicating a backing data source. If the <code>from</code> property is omitted, Vega defaults to generating a single mark instance. We set the text layout and appearance using a set of constants, and set the <code>text</code> content to be the <code>title</code> signal. As the <code>title</code> signal changes, the text will reactively update in response.</p>
+
+<p>However, there is still a problem. We positioned the text at the top-right of the display, such that much of the text will actually be drawn off-screen!</p>
+
+<pre><code class="json language-json">"padding": {"top": 25, "left": 0, "right": 0, "bottom": 0},
+</code></pre>
+
+<p>To fix the problem, we can add <code>25</code> pixels of padding to the <code>top</code> of the visualization.</p>
+
+<div id="vega_vis_5"></div>
+
+<p>Now we can mouse over each airport to see more information.</p>
+
+<h2 id="step8sorttheairportsbysize">Step 8: Sort the Airports by Size</h2>
+
+<p>Notice any problems with our visualization? Take a look at Chicago: O'Hare completely covers Midway! Or look at Dallas, where DFW clobbers DAL. When visualizing points of varying size, it is common to sort by size, such that smaller elements are drawn on top of larger elements.</p>
+
+<pre><code class="json language-json">{
+  "name": "airports",
+  "url": "data/airports.csv",
+  "format": {"type": "csv", "parse": "auto"},
+  "transform": [
+    {
+      "type": "lookup", "on": "traffic", "onKey": "origin",
+      "keys": ["iata"], "as": ["traffic"]
+    },
+    {
+      "type": "geo", "projection": "albersUsa",
+      "lon": "longitude", "lat": "latitude"
+    },
+    {
+      "type": "filter",
+      "test": "datum.traffic &amp;&amp; datum.layout_x != null &amp;&amp; datum.layout_y != null"
+    },
+    { "type": "sort", "by": "-traffic.flights" }
+  ]
+}
+</code></pre>
+
+<p>We now add a <code>sort</code> transform to the <code>airports</code> data, ordering by traffic. The minus sign (<code>-</code>) indicates we should sort in descending order, thus drawing larger points before smaller points.</p>
+
+<div id="vega_vis_6"></div>
+
+<p>That's better!</p>
+
+<h2 id="step9plottheconnectionsamongairports">Step 9: Plot the Connections among Airports</h2>
+
+<p>Now we're ready to visualize the connections among the airports.</p>
+
+<p>Let's add a new entry (<code>routes</code>) to the end of the <code>data</code> array:</p>
+
+<pre><code class="json language-json">{
+  "name": "routes",
+  "url": "data/flights-airport.csv",
+  "format": {"type": "csv", "parse": "auto"},
+  "transform": [
+    {
+      "type": "lookup", "on": "airports", "onKey": "iata",
+      "keys": ["origin", "destination"], "as": ["_source", "_target"]
+    },
+    { "type": "filter", "test": "datum._source &amp;&amp; datum._target" },
+    { "type": "linkpath", "shape": "line" }
+  ]
+}
+</code></pre>
+
+<p>After loading the CSV file, we apply a series of transforms. First, we need the coordinates for both the <code>origin</code> and <code>destination</code> airports so we perform a <code>lookup</code> against the <code>airports</code> data. The transform is similar to our earlier lookup against the <code>traffic</code> data, except here we perform two lookups at once to grab both the origin and destination. Second, we filter out any routes for which the lookup failed. This keeps us safe if the <code>routes</code> data contains any origins or destinations not present in the <code>airports</code> data.</p>
+
+<p>Finally, we add a <code>linkpath</code> transform, which generates an SVG path based on link end points. The <code>linkpath</code> shape defaults to a straight line, but we explicitly set the <code>shape</code> parameter to <code>line</code> to make our intention clear. (For a different style, try setting the shape to <code>curve</code> instead!)</p>
+
+<p>To determine the link end points, the <code>linkpath</code> transform looks for <code>_source.layout_x</code> and <code>_source.layout_y</code> properties (and similarly for <code>_target</code>) by default. In this case, we don't need to provide any additional configuration &ndash; that is why we set <code>_source</code> and <code>_target</code> as the output properties of the <code>lookup</code> transform!</p>
+
+<p>Now we can add a new <code>path</code> mark to the <code>marks</code> array to visualize the routes:</p>
+
+<pre><code class="json language-json">{
+  "type": "path",
+  "interactive": false,
+  "from": {"data": "routes"},
+  "properties": {
+    "enter": {
+      "path": {"field": "layout_path"},
+      "stroke": {"value": "black"},
+      "strokeOpacity": {"value": 0.15}
+    }
+  }
+}
+</code></pre>
+
+<p>We set the <code>interactive</code> property false to prevent the links from interfering with mouse events from the airport symbols. As there may be many links with lots of overlap, we also set the <code>strokeOpacity</code> to a low value (<code>0.15</code>).</p>
+
+<div id="vega_vis_7"></div>
+
+<p>What a mess! Let's add interaction to provide details-on-demand instead.</p>
+
+<h2 id="step10showconnectionsonmousehover">Step 10: Show Connections on Mouse Hover</h2>
+
+<p>Adding hover-sensitive filtering is now quite easy:</p>
+
+<pre><code class="json language-json">{
+  "name": "routes",
+  "url": "data/flights-airport.csv",
+  "format": {"type": "csv", "parse": "auto"},
+  "transform": [
+    { "type": "filter", "test": "hover &amp;&amp; hover.iata == datum.origin" },
+    {
+      "type": "lookup", "on": "airports", "onKey": "iata",
+      "keys": ["origin", "destination"], "as": ["_source", "_target"]
+    },
+    { "type": "filter", "test": "datum._source &amp;&amp; datum._target" },
+    { "type": "linkpath", "shape": "line" }
+  ]
+}
+</code></pre>
+
+<p>We already have a <code>hover</code> signal set up to track the data associated with the currently selected airport. We just need to add a <code>filter</code> transform to our <code>routes</code> data: the new <code>filter</code> at the beginning of the transform list keeps only those routes whose <code>origin</code> matches the selected airport. In addition, we increase the path <code>strokeOpacity</code> to <code>0.35</code> to be a bit more opaque.</p>
+
+<div id="vega_vis_8"></div>
+
+<p>Now we can interactively explore the network of routes!</p>
+
+<h2 id="step11addmouseaccelerationviavoronoicells">Step 11: Add Mouse Acceleration via Voronoi Cells</h2>
+
+<p>We now have a nice interactive visualization, but we can make it even better. Some of the airports are rather small and so hard to select. Instead of having to hover directly over a point, let's update the visualization to select the <em>nearest</em> airport to the mouse cursor.</p>
+
+<p>To do so, we can create a <a href="https://en.wikipedia.org/wiki/Voronoi_diagram">Voronoi diagram</a>, which subdivides space into the cells containing all points closest to our data points. We can then filter the routes based on mouse over of the Voronoi cells. To compute the Voronoi cells, we add a <code>voronoi</code> transform to the <code>airports</code> data:</p>
+
+<pre><code class="json language-json">{
+  "name": "airports",
+  "url": "data/airports.csv",
+  "format": {"type": "csv", "parse": "auto"},
+  "transform": [
+    {
+      "type": "lookup", "on": "traffic", "onKey": "origin",
+      "keys": ["iata"], "as": ["traffic"]
+    },
+    {
+      "type": "geo", "projection": "albersUsa",
+      "lon": "longitude", "lat": "latitude"
+    },
+    {
+      "type": "filter",
+      "test": "datum.traffic &amp;&amp; datum.layout_x != null &amp;&amp; datum.layout_y != null"
+    },
+    { "type": "sort", "by": "-traffic.flights" },
+    { "type": "voronoi", "x": "layout_x", "y": "layout_y" }
+  ]
+}
+</code></pre>
+
+<p>The <code>voronoi</code> transform computes the enclosing cells for each airport using the <code>layout_x</code> and <code>layout_y</code> coordinates. The output is an SVG path string written to the <code>layout_path</code> property.</p>
+
+<p>Next, we add the Voronoi cells to the visualization as an invisible set of <code>path</code> marks. We add the following to the <code>data</code> array, right <em>after</em> the airport <code>symbol</code> marks:</p>
+
+<pre><code class="json   language-json  ">{
+  "type": "path",
+  "name": "cell",
+  "from": {"data": "airports"},
+  "properties": {
+    "enter": {
+      "path": {"field": "layout_path"},
+      "fill": {"value": "transparent"}
+    }
+  }
+}
+</code></pre>
+
+<p>We set the <code>fill</code> to <code>transparent</code> to ensure that the Voronoi cells can't be seen, but still receive input events. We also specify a <code>name</code> property so that we can refer to these marks elsewhere.</p>
+
+<p>Finally, we update our <code>hover</code> signal to respond to mouse events on the Voronoi cells instead of on the circle <code>symbol</code> marks:</p>
+
+<pre><code class="json language-json">{
+  "name": "hover", "init": null,
+  "streams": [
+    {"type": "@cell:mouseover", "expr": "datum"},
+    {"type": "@cell:mouseout", "expr": "null"}
+  ]
+}
+</code></pre>
+
+<p>Here we simply replace <code>symbol:</code> with <code>@cell:</code>. The <code>@name</code> pattern selects only events originating from a mark with the provided name.</p>
+
+<div id="vega_vis_9"></div>
+
+<p>Now we have much improved, user-friendly mouse selection!</p>
+
+<h2 id="step12onelastthing">Step 12: One Last Thing...</h2>
+
+<p>We now have a complete interactive visualization! But before we wrap up, let's add a little easter egg. We use invisible Voronoi cells to help with mouse selections. In order to better understand them, it might nice to see actually see them! Let's toggle their visibility with a double click...</p>
+
+<p>We add a new signal named <code>cell_stroke</code> to our <code>signals</code> array:</p>
+
+<pre><code class="json language-json">{
+  "name": "cell_stroke", "init": null,
+  "streams": [{"type": "dblclick", "expr": "cell_stroke ? null : 'brown'"}]
+}
+</code></pre>
+
+<p>This signal responds to any double click (<code>dblclick</code>) event, toggling the <code>cell_stroke</code> signal between <code>null</code> and <code>'brown'</code>. Then we update our Voronoi cell marks:</p>
+
+<pre><code class="json language-json">{
+  "type": "path",
+  "name": "cell",
+  "from": {"data": "airports"},
+  "properties": {
+    "enter": {
+      "path": {"field": "layout_path"},
+      "fill": {"value": "transparent"},
+      "strokeWidth": {"value": 0.35}
+    },
+    "update": {
+      "stroke": {"signal": "cell_stroke"}
+    }
+  }
+}
+</code></pre>
+
+<p>We add <code>strokeWidth</code> to the <code>enter</code> properties, and add <code>stroke</code> color to the <code>update</code> properties. We set <code>stroke</code> to be the value of the <code>cell_stroke</code> signal, so that the Voronoi cells will automatically toggle their visibility upon double click.</p>
+
+<p>To test out our easter egg, scroll back to the top of this page and try double clicking the visualization. Or, review the entire specification for this visualization within the <a href="http://vega.github.io/vega-editor?spec=airports">Vega Editor</a>.</p>
+
+<h3 id="nextsteps">Next Steps</h3>
+
+<p>Though we've reached the end of this tutorial, there are a number of additional variations you might attempt on your own:</p>
+
+<ul>
+<li>Can you modify the signals to support touch events as well as mouse events?</li>
+
+<li>In addition to showing links on hover, can you make the origin airport highlight in a new color?</li>
+
+<li>When selecting an origin airport, can you make the destinations highlight? (Hint: use a <a href="https://github.com/vega/vega/wiki/Predicates">predicate</a>!)</li>
+
+<li>Can you change the map projection to view the routes from a different perspective?</li>
+
+<li>Can you collect additional data and visualize airports across the entire world?</li>
+</ul>
+<script>
+vg.embed('#vega_vis_0',{source: '{\n  "width": 900,\n  "height": 560,\n  "padding": {"top": 25, "left": 0, "right": 0, "bottom": 0},\n\n  "data": [\n    {\n      "name": "states",\n      "url": "data/us-10m.json",\n      "format": {"type": "topojson", "feature": "states"},\n      "transform": [\n        {\n          "type": "geopath", "projection": "albersUsa",\n          "scale": 1200, "translate": [450, 280]\n        }\n      ]\n    },\n    {\n      "name": "traffic",\n      "url": "data/flights-airport.csv",\n      "format": {"type": "csv", "parse": "auto"},\n      "transform": [\n        {\n          "type": "aggregate", "groupby": ["origin"],\n          "summarize": [{"field": "count", "ops": ["sum"], "as": ["flights"]}]\n        }\n      ]\n    },\n    {\n      "name": "airports",\n      "url": "data/airports.csv",\n      "format": {"type": "csv", "parse": "auto"},\n      "transform": [\n        {\n          "type": "lookup", "on": "traffic", "onKey": "origin",\n          "keys": ["iata"], "as": ["traffic"]\n        },\n        {\n          "type": "geo", "projection": "albersUsa",\n          "scale": 1200, "translate": [450, 280],\n          "lon": "longitude", "lat": "latitude"\n        },\n        {\n          "type": "filter",\n          "test": "datum.traffic && datum.layout_x != null && datum.layout_y != null"\n        },\n        { "type": "sort", "by": "-traffic.flights" },\n        { "type": "voronoi", "x": "layout_x", "y": "layout_y" }\n      ]\n    },\n    {\n      "name": "routes",\n      "url": "data/flights-airport.csv",\n      "format": {"type": "csv", "parse": "auto"},\n      "transform": [\n        { "type": "filter", "test": "hover && hover.iata == datum.origin" },\n        {\n          "type": "lookup", "on": "airports", "onKey": "iata",\n          "keys": ["origin", "destination"], "as": ["_source", "_target"]\n        },\n        { "type": "filter", "test": "datum._source && datum._target" },\n        { "type": "linkpath", "shape": "line" }\n      ]\n    }\n  ],\n\n  "scales": [\n    {\n      "name": "size",\n      "type": "linear",\n      "domain": {"data": "traffic", "field": "flights"},\n      "range": [16, 1000]\n    }\n  ],\n\n  "signals": [\n    {\n      "name": "hover", "init": null,\n      "streams": [\n        {"type": "@cell:mouseover", "expr": "datum"},\n        {"type": "@cell:mouseout", "expr": "null"}\n      ]\n    },\n    {\n      "name": "title", "init": "U.S. Airports, 2008",\n      "streams": [{\n        "type": "hover", \n        "expr": "hover ? hover.name + \' (\' + hover.iata + \')\' : \'U.S. Airports, 2008\'"\n      }]\n    },\n    {\n      "name": "cell_stroke", "init": null,\n      "streams": [{"type": "dblclick", "expr": "cell_stroke ? null : \'brown\'"}]\n    }\n  ],\n\n  "marks": [\n    {\n      "type": "path",\n      "from": {"data": "states"},\n      "properties": {\n        "enter": {\n          "path": {"field": "layout_path"},\n          "fill": {"value": "#dedede"},\n          "stroke": {"value": "white"}\n        }\n      }\n    },\n    {\n      "type": "symbol",\n      "from": {"data": "airports"},\n      "properties": {\n        "enter": {\n          "x": {"field": "layout_x"},\n          "y": {"field": "layout_y"},\n          "size": {"scale": "size", "field": "traffic.flights"},\n          "fill": {"value": "steelblue"},\n          "fillOpacity": {"value": 0.8},\n          "stroke": {"value": "white"},\n          "strokeWidth": {"value": 1.5}\n        }\n      }\n    },\n    {\n      "type": "path",\n      "name": "cell",\n      "from": {"data": "airports"},\n      "properties": {\n        "enter": {\n          "path": {"field": "layout_path"},\n          "fill": {"value": "transparent"},\n          "strokeWidth": {"value": 0.35}\n        },\n        "update": {\n          "stroke": {"signal": "cell_stroke"}\n        }\n      }\n    },\n    {\n      "type": "path",\n      "interactive": false,\n      "from": {"data": "routes"},\n      "properties": {\n        "enter": {\n          "path": {"field": "layout_path"},\n          "stroke": {"value": "black"},\n          "strokeOpacity": {"value": 0.35}\n        }\n      }\n    },\n    {\n      "type": "text",\n      "interactive": false,\n      "properties": {\n        "enter": {\n          "x": {"value": 895},\n          "y": {"value": 0},\n          "fill": {"value": "black"},\n          "fontSize": {"value": 20},\n          "align": {"value": "right"}\n        },\n        "update": {\n          "text": {"signal": "title"}\n        }\n      }\n    }\n  ]\n}'});
+vg.embed('#vega_vis_1',{source: '{\n  "width": 900,\n  "height": 560,\n  "padding": {"top": 0, "left": 0, "right": 0, "bottom": 0},\n\n  "data": [\n    {\n      "name": "states",\n      "url": "data/us-10m.json",\n      "format": {"type": "topojson", "feature": "states"},\n      "transform": [\n        {\n          "type": "geopath", "projection": "albersUsa",\n          "scale": 1200, "translate": [450, 280]\n        }\n      ]\n    }\n  ],\n\n  "scales": [],\n  "signals": [],\n\n  "marks": [\n    {\n      "type": "path",\n      "from": {"data": "states"},\n      "properties": {\n        "enter": {\n          "path": {"field": "layout_path"},\n          "fill": {"value": "#dedede"},\n          "stroke": {"value": "white"}\n        }\n      }\n    }\n  ]\n}'});
+vg.embed('#vega_vis_2',{source: '{\n  "width": 900,\n  "height": 560,\n  "padding": {"top": 0, "left": 0, "right": 0, "bottom": 0},\n\n  "data": [\n    {\n      "name": "states",\n      "url": "data/us-10m.json",\n      "format": {"type": "topojson", "feature": "states"},\n      "transform": [\n        {\n          "type": "geopath", "projection": "albersUsa",\n          "scale": 1200, "translate": [450, 280]\n        }\n      ]\n    },\n    {\n      "name": "airports",\n      "url": "data/airports.csv",\n      "format": {"type": "csv", "parse": "auto"},\n      "transform": [\n        {\n          "type": "geo", "projection": "albersUsa",\n          "scale": 1200, "translate": [450, 280],\n          "lon": "longitude", "lat": "latitude"\n        },\n        {\n          "type": "filter",\n          "test": "datum.layout_x != null && datum.layout_y != null"\n        }\n      ]\n    }\n  ],\n\n  "scales": [],\n  "signals": [],\n\n  "marks": [\n    {\n      "type": "path",\n      "from": {"data": "states"},\n      "properties": {\n        "enter": {\n          "path": {"field": "layout_path"},\n          "fill": {"value": "#dedede"},\n          "stroke": {"value": "white"}\n        }\n      }\n    },\n    {\n      "type": "symbol",\n      "from": {"data": "airports"},\n      "properties": {\n        "enter": {\n          "x": {"field": "layout_x"},\n          "y": {"field": "layout_y"},\n          "size": {"value": 16},\n          "fill": {"value": "steelblue"},\n          "fillOpacity": {"value": 0.8},\n          "stroke": {"value": "white"},\n          "strokeWidth": {"value": 0.5}\n        }\n      }\n    }\n  ]\n}'});
+vg.embed('#vega_vis_3',{source: '{\n  "width": 900,\n  "height": 560,\n  "padding": {"top": 0, "left": 0, "right": 0, "bottom": 0},\n\n  "data": [\n    {\n      "name": "states",\n      "url": "data/us-10m.json",\n      "format": {"type": "topojson", "feature": "states"},\n      "transform": [\n        {\n          "type": "geopath", "projection": "albersUsa",\n          "scale": 1200, "translate": [450, 280]\n        }\n      ]\n    },\n    {\n      "name": "traffic",\n      "url": "data/flights-airport.csv",\n      "format": {"type": "csv", "parse": "auto"},\n      "transform": [\n        {\n          "type": "aggregate", "groupby": ["origin"],\n          "summarize": [{"field": "count", "ops": ["sum"], "as": ["flights"]}]\n        }\n      ]\n    },\n    {\n      "name": "airports",\n      "url": "data/airports.csv",\n      "format": {"type": "csv", "parse": "auto"},\n      "transform": [\n        {\n          "type": "lookup", "on": "traffic", "onKey": "origin",\n          "keys": ["iata"], "as": ["traffic"]\n        },\n        {\n          "type": "geo", "projection": "albersUsa",\n          "scale": 1200, "translate": [450, 280],\n          "lon": "longitude", "lat": "latitude"\n        },\n        {\n          "type": "filter",\n          "test": "datum.traffic && datum.layout_x != null && datum.layout_y != null"\n        }\n      ]\n    }\n  ],\n\n  "scales": [],\n  "signals": [],\n\n  "marks": [\n    {\n      "type": "path",\n      "from": {"data": "states"},\n      "properties": {\n        "enter": {\n          "path": {"field": "layout_path"},\n          "fill": {"value": "#dedede"},\n          "stroke": {"value": "white"}\n        }\n      }\n    },\n    {\n      "type": "symbol",\n      "from": {"data": "airports"},\n      "properties": {\n        "enter": {\n          "x": {"field": "layout_x"},\n          "y": {"field": "layout_y"},\n          "size": {"value": 16},\n          "fill": {"value": "steelblue"},\n          "fillOpacity": {"value": 0.8},\n          "stroke": {"value": "white"},\n          "strokeWidth": {"value": 1.5}\n        }\n      }\n    }\n  ]\n}'});
+vg.embed('#vega_vis_4',{source: '{\n  "width": 900,\n  "height": 560,\n  "padding": {"top": 0, "left": 0, "right": 0, "bottom": 0},\n\n  "data": [\n    {\n      "name": "states",\n      "url": "data/us-10m.json",\n      "format": {"type": "topojson", "feature": "states"},\n      "transform": [\n        {\n          "type": "geopath", "projection": "albersUsa",\n          "scale": 1200, "translate": [450, 280]\n        }\n      ]\n    },\n    {\n      "name": "traffic",\n      "url": "data/flights-airport.csv",\n      "format": {"type": "csv", "parse": "auto"},\n      "transform": [\n        {\n          "type": "aggregate", "groupby": ["origin"],\n          "summarize": [{"field": "count", "ops": ["sum"], "as": ["flights"]}]\n        }\n      ]\n    },\n    {\n      "name": "airports",\n      "url": "data/airports.csv",\n      "format": {"type": "csv", "parse": "auto"},\n      "transform": [\n        {\n          "type": "lookup", "on": "traffic", "onKey": "origin",\n          "keys": ["iata"], "as": ["traffic"]\n        },\n        {\n          "type": "geo", "projection": "albersUsa",\n          "scale": 1200, "translate": [450, 280],\n          "lon": "longitude", "lat": "latitude"\n        },\n        {\n          "type": "filter",\n          "test": "datum.traffic && datum.layout_x != null && datum.layout_y != null"\n        }\n      ]\n    }\n  ],\n\n  "scales": [\n    {\n      "name": "size",\n      "type": "linear",\n      "domain": {"data": "traffic", "field": "flights"},\n      "range": [16, 1000]\n    }\n  ],\n\n  "signals": [],\n\n  "marks": [\n    {\n      "type": "path",\n      "from": {"data": "states"},\n      "properties": {\n        "enter": {\n          "path": {"field": "layout_path"},\n          "fill": {"value": "#dedede"},\n          "stroke": {"value": "white"}\n        }\n      }\n    },\n    {\n      "type": "symbol",\n      "from": {"data": "airports"},\n      "properties": {\n        "enter": {\n          "x": {"field": "layout_x"},\n          "y": {"field": "layout_y"},\n          "size": {"scale": "size", "field": "traffic.flights"},\n          "fill": {"value": "steelblue"},\n          "fillOpacity": {"value": 0.8},\n          "stroke": {"value": "white"},\n          "strokeWidth": {"value": 1.5}\n        }\n      }\n    }\n  ]\n}'});
+vg.embed('#vega_vis_5',{source: '{\n  "width": 900,\n  "height": 560,\n  "padding": {"top": 25, "left": 0, "right": 0, "bottom": 0},\n\n  "data": [\n    {\n      "name": "states",\n      "url": "data/us-10m.json",\n      "format": {"type": "topojson", "feature": "states"},\n      "transform": [\n        {\n          "type": "geopath", "projection": "albersUsa",\n          "scale": 1200, "translate": [450, 280]\n        }\n      ]\n    },\n    {\n      "name": "traffic",\n      "url": "data/flights-airport.csv",\n      "format": {"type": "csv", "parse": "auto"},\n      "transform": [\n        {\n          "type": "aggregate", "groupby": ["origin"],\n          "summarize": [{"field": "count", "ops": ["sum"], "as": ["flights"]}]\n        }\n      ]\n    },\n    {\n      "name": "airports",\n      "url": "data/airports.csv",\n      "format": {"type": "csv", "parse": "auto"},\n      "transform": [\n        {\n          "type": "lookup", "on": "traffic", "onKey": "origin",\n          "keys": ["iata"], "as": ["traffic"]\n        },\n        {\n          "type": "geo", "projection": "albersUsa",\n          "scale": 1200, "translate": [450, 280],\n          "lon": "longitude", "lat": "latitude"\n        },\n        {\n          "type": "filter",\n          "test": "datum.traffic && datum.layout_x != null && datum.layout_y != null"\n        }\n      ]\n    }\n  ],\n\n  "scales": [\n    {\n      "name": "size",\n      "type": "linear",\n      "domain": {"data": "traffic", "field": "flights"},\n      "range": [16, 1000]\n    }\n  ],\n\n  "signals": [\n    {\n      "name": "hover", "init": null,\n      "streams": [\n        {"type": "symbol:mouseover", "expr": "datum"},\n        {"type": "symbol:mouseout", "expr": "null"}\n      ]\n    },\n    {\n      "name": "title", "init": "U.S. Airports, 2008",\n      "streams": [{\n        "type": "hover", \n        "expr": "hover ? hover.name + \' (\' + hover.iata + \')\' : \'U.S. Airports, 2008\'"\n      }]\n    }\n  ],\n\n  "marks": [\n    {\n      "type": "path",\n      "from": {"data": "states"},\n      "properties": {\n        "enter": {\n          "path": {"field": "layout_path"},\n          "fill": {"value": "#dedede"},\n          "stroke": {"value": "white"}\n        }\n      }\n    },\n    {\n      "type": "symbol",\n      "from": {"data": "airports"},\n      "properties": {\n        "enter": {\n          "x": {"field": "layout_x"},\n          "y": {"field": "layout_y"},\n          "size": {"scale": "size", "field": "traffic.flights"},\n          "fill": {"value": "steelblue"},\n          "fillOpacity": {"value": 0.8},\n          "stroke": {"value": "white"},\n          "strokeWidth": {"value": 1.5}\n        }\n      }\n    },\n    {\n      "type": "text",\n      "interactive": false,\n      "properties": {\n        "enter": {\n          "x": {"value": 895},\n          "y": {"value": 0},\n          "fill": {"value": "black"},\n          "fontSize": {"value": 20},\n          "align": {"value": "right"}\n        },\n        "update": {\n          "text": {"signal": "title"}\n        }\n      }\n    }\n  ]\n}'});
+vg.embed('#vega_vis_6',{source: '{\n  "width": 900,\n  "height": 560,\n  "padding": {"top": 25, "left": 0, "right": 0, "bottom": 0},\n\n  "data": [\n    {\n      "name": "states",\n      "url": "data/us-10m.json",\n      "format": {"type": "topojson", "feature": "states"},\n      "transform": [\n        {\n          "type": "geopath", "projection": "albersUsa",\n          "scale": 1200, "translate": [450, 280]\n        }\n      ]\n    },\n    {\n      "name": "traffic",\n      "url": "data/flights-airport.csv",\n      "format": {"type": "csv", "parse": "auto"},\n      "transform": [\n        {\n          "type": "aggregate", "groupby": ["origin"],\n          "summarize": [{"field": "count", "ops": ["sum"], "as": ["flights"]}]\n        }\n      ]\n    },\n    {\n      "name": "airports",\n      "url": "data/airports.csv",\n      "format": {"type": "csv", "parse": "auto"},\n      "transform": [\n        {\n          "type": "lookup", "on": "traffic", "onKey": "origin",\n          "keys": ["iata"], "as": ["traffic"]\n        },\n        {\n          "type": "geo", "projection": "albersUsa",\n          "scale": 1200, "translate": [450, 280],\n          "lon": "longitude", "lat": "latitude"\n        },\n        {\n          "type": "filter",\n          "test": "datum.traffic && datum.layout_x != null && datum.layout_y != null"\n        },\n        { "type": "sort", "by": "-traffic.flights" }\n      ]\n    }\n  ],\n\n  "scales": [\n    {\n      "name": "size",\n      "type": "linear",\n      "domain": {"data": "traffic", "field": "flights"},\n      "range": [16, 1000]\n    }\n  ],\n\n  "signals": [\n    {\n      "name": "hover", "init": null,\n      "streams": [\n        {"type": "symbol:mouseover", "expr": "datum"},\n        {"type": "symbol:mouseout", "expr": "null"}\n      ]\n    },\n    {\n      "name": "title", "init": "U.S. Airports, 2008",\n      "streams": [{\n        "type": "hover", \n        "expr": "hover ? hover.name + \' (\' + hover.iata + \')\' : \'U.S. Airports, 2008\'"\n      }]\n    }\n  ],\n\n  "marks": [\n    {\n      "type": "path",\n      "from": {"data": "states"},\n      "properties": {\n        "enter": {\n          "path": {"field": "layout_path"},\n          "fill": {"value": "#dedede"},\n          "stroke": {"value": "white"}\n        }\n      }\n    },\n    {\n      "type": "symbol",\n      "from": {"data": "airports"},\n      "properties": {\n        "enter": {\n          "x": {"field": "layout_x"},\n          "y": {"field": "layout_y"},\n          "size": {"scale": "size", "field": "traffic.flights"},\n          "fill": {"value": "steelblue"},\n          "fillOpacity": {"value": 0.8},\n          "stroke": {"value": "white"},\n          "strokeWidth": {"value": 1.5}\n        }\n      }\n    },\n    {\n      "type": "text",\n      "interactive": false,\n      "properties": {\n        "enter": {\n          "x": {"value": 895},\n          "y": {"value": 0},\n          "fill": {"value": "black"},\n          "fontSize": {"value": 20},\n          "align": {"value": "right"}\n        },\n        "update": {\n          "text": {"signal": "title"}\n        }\n      }\n    }\n  ]\n}'});
+vg.embed('#vega_vis_7',{source: '{\n  "width": 900,\n  "height": 560,\n  "padding": {"top": 25, "left": 0, "right": 0, "bottom": 0},\n\n  "data": [\n    {\n      "name": "states",\n      "url": "data/us-10m.json",\n      "format": {"type": "topojson", "feature": "states"},\n      "transform": [\n        {\n          "type": "geopath", "projection": "albersUsa",\n          "scale": 1200, "translate": [450, 280]\n        }\n      ]\n    },\n    {\n      "name": "traffic",\n      "url": "data/flights-airport.csv",\n      "format": {"type": "csv", "parse": "auto"},\n      "transform": [\n        {\n          "type": "aggregate", "groupby": ["origin"],\n          "summarize": [{"field": "count", "ops": ["sum"], "as": ["flights"]}]\n        }\n      ]\n    },\n    {\n      "name": "airports",\n      "url": "data/airports.csv",\n      "format": {"type": "csv", "parse": "auto"},\n      "transform": [\n        {\n          "type": "lookup", "on": "traffic", "onKey": "origin",\n          "keys": ["iata"], "as": ["traffic"]\n        },\n        {\n          "type": "geo", "projection": "albersUsa",\n          "scale": 1200, "translate": [450, 280],\n          "lon": "longitude", "lat": "latitude"\n        },\n        {\n          "type": "filter",\n          "test": "datum.traffic && datum.layout_x != null && datum.layout_y != null"\n        },\n        { "type": "sort", "by": "-traffic.flights" }\n      ]\n    },\n    {\n      "name": "routes",\n      "url": "data/flights-airport.csv",\n      "format": {"type": "csv", "parse": "auto"},\n      "transform": [\n        {\n          "type": "lookup", "on": "airports", "onKey": "iata",\n          "keys": ["origin", "destination"], "as": ["_source", "_target"]\n        },\n        { "type": "filter", "test": "datum._source && datum._target" },\n        { "type": "linkpath", "shape": "line" }\n      ]\n    }\n  ],\n\n  "scales": [\n    {\n      "name": "size",\n      "type": "linear",\n      "domain": {"data": "traffic", "field": "flights"},\n      "range": [16, 1000]\n    }\n  ],\n\n  "signals": [\n    {\n      "name": "hover", "init": null,\n      "streams": [\n        {"type": "symbol:mouseover", "expr": "datum"},\n        {"type": "symbol:mouseout", "expr": "null"}\n      ]\n    },\n    {\n      "name": "title", "init": "U.S. Airports, 2008",\n      "streams": [{\n        "type": "hover", \n        "expr": "hover ? hover.name + \' (\' + hover.iata + \')\' : \'U.S. Airports, 2008\'"\n      }]\n    }\n  ],\n\n  "marks": [\n    {\n      "type": "path",\n      "from": {"data": "states"},\n      "properties": {\n        "enter": {\n          "path": {"field": "layout_path"},\n          "fill": {"value": "#dedede"},\n          "stroke": {"value": "white"}\n        }\n      }\n    },\n    {\n      "type": "symbol",\n      "from": {"data": "airports"},\n      "properties": {\n        "enter": {\n          "x": {"field": "layout_x"},\n          "y": {"field": "layout_y"},\n          "size": {"scale": "size", "field": "traffic.flights"},\n          "fill": {"value": "steelblue"},\n          "fillOpacity": {"value": 0.8},\n          "stroke": {"value": "white"},\n          "strokeWidth": {"value": 1.5}\n        }\n      }\n    },\n    {\n      "type": "path",\n      "interactive": false,\n      "from": {"data": "routes"},\n      "properties": {\n        "enter": {\n          "path": {"field": "layout_path"},\n          "stroke": {"value": "black"},\n          "strokeOpacity": {"value": 0.15}\n        }\n      }\n    },\n    {\n      "type": "text",\n      "interactive": false,\n      "properties": {\n        "enter": {\n          "x": {"value": 895},\n          "y": {"value": 0},\n          "fill": {"value": "black"},\n          "fontSize": {"value": 20},\n          "align": {"value": "right"}\n        },\n        "update": {\n          "text": {"signal": "title"}\n        }\n      }\n    }\n  ]\n}'});
+vg.embed('#vega_vis_8',{source: '{\n  "width": 900,\n  "height": 560,\n  "padding": {"top": 25, "left": 0, "right": 0, "bottom": 0},\n\n  "data": [\n    {\n      "name": "states",\n      "url": "data/us-10m.json",\n      "format": {"type": "topojson", "feature": "states"},\n      "transform": [\n        {\n          "type": "geopath", "projection": "albersUsa",\n          "scale": 1200, "translate": [450, 280]\n        }\n      ]\n    },\n    {\n      "name": "traffic",\n      "url": "data/flights-airport.csv",\n      "format": {"type": "csv", "parse": "auto"},\n      "transform": [\n        {\n          "type": "aggregate", "groupby": ["origin"],\n          "summarize": [{"field": "count", "ops": ["sum"], "as": ["flights"]}]\n        }\n      ]\n    },\n    {\n      "name": "airports",\n      "url": "data/airports.csv",\n      "format": {"type": "csv", "parse": "auto"},\n      "transform": [\n        {\n          "type": "lookup", "on": "traffic", "onKey": "origin",\n          "keys": ["iata"], "as": ["traffic"]\n        },\n        {\n          "type": "geo", "projection": "albersUsa",\n          "scale": 1200, "translate": [450, 280],\n          "lon": "longitude", "lat": "latitude"\n        },\n        {\n          "type": "filter",\n          "test": "datum.traffic && datum.layout_x != null && datum.layout_y != null"\n        },\n        { "type": "sort", "by": "-traffic.flights" }\n      ]\n    },\n    {\n      "name": "routes",\n      "url": "data/flights-airport.csv",\n      "format": {"type": "csv", "parse": "auto"},\n      "transform": [\n        { "type": "filter", "test": "hover && hover.iata == datum.origin" },\n        {\n          "type": "lookup", "on": "airports", "onKey": "iata",\n          "keys": ["origin", "destination"], "as": ["_source", "_target"]\n        },\n        { "type": "filter", "test": "datum._source && datum._target" },\n        { "type": "linkpath", "shape": "line" }\n      ]\n    }\n  ],\n\n  "scales": [\n    {\n      "name": "size",\n      "type": "linear",\n      "domain": {"data": "traffic", "field": "flights"},\n      "range": [16, 1000]\n    }\n  ],\n\n  "signals": [\n    {\n      "name": "hover", "init": null,\n      "streams": [\n        {"type": "symbol:mouseover", "expr": "datum"},\n        {"type": "symbol:mouseout", "expr": "null"}\n      ]\n    },\n    {\n      "name": "title", "init": "U.S. Airports, 2008",\n      "streams": [{\n        "type": "hover", \n        "expr": "hover ? hover.name + \' (\' + hover.iata + \')\' : \'U.S. Airports, 2008\'"\n      }]\n    }\n  ],\n\n  "marks": [\n    {\n      "type": "path",\n      "from": {"data": "states"},\n      "properties": {\n        "enter": {\n          "path": {"field": "layout_path"},\n          "fill": {"value": "#dedede"},\n          "stroke": {"value": "white"}\n        }\n      }\n    },\n    {\n      "type": "symbol",\n      "from": {"data": "airports"},\n      "properties": {\n        "enter": {\n          "x": {"field": "layout_x"},\n          "y": {"field": "layout_y"},\n          "size": {"scale": "size", "field": "traffic.flights"},\n          "fill": {"value": "steelblue"},\n          "fillOpacity": {"value": 0.8},\n          "stroke": {"value": "white"},\n          "strokeWidth": {"value": 1.5}\n        }\n      }\n    },\n    {\n      "type": "path",\n      "interactive": false,\n      "from": {"data": "routes"},\n      "properties": {\n        "enter": {\n          "path": {"field": "layout_path"},\n          "stroke": {"value": "black"},\n          "strokeOpacity": {"value": 0.35}\n        }\n      }\n    },\n    {\n      "type": "text",\n      "interactive": false,\n      "properties": {\n        "enter": {\n          "x": {"value": 895},\n          "y": {"value": 0},\n          "fill": {"value": "black"},\n          "fontSize": {"value": 20},\n          "align": {"value": "right"}\n        },\n        "update": {\n          "text": {"signal": "title"}\n        }\n      }\n    }\n  ]\n}'});
+vg.embed('#vega_vis_9',{source: '{\n  "width": 900,\n  "height": 560,\n  "padding": {"top": 25, "left": 0, "right": 0, "bottom": 0},\n\n  "data": [\n    {\n      "name": "states",\n      "url": "data/us-10m.json",\n      "format": {"type": "topojson", "feature": "states"},\n      "transform": [\n        {\n          "type": "geopath", "projection": "albersUsa",\n          "scale": 1200, "translate": [450, 280]\n        }\n      ]\n    },\n    {\n      "name": "traffic",\n      "url": "data/flights-airport.csv",\n      "format": {"type": "csv", "parse": "auto"},\n      "transform": [\n        {\n          "type": "aggregate", "groupby": ["origin"],\n          "summarize": [{"field": "count", "ops": ["sum"], "as": ["flights"]}]\n        }\n      ]\n    },\n    {\n      "name": "airports",\n      "url": "data/airports.csv",\n      "format": {"type": "csv", "parse": "auto"},\n      "transform": [\n        {\n          "type": "lookup", "on": "traffic", "onKey": "origin",\n          "keys": ["iata"], "as": ["traffic"]\n        },\n        {\n          "type": "geo", "projection": "albersUsa",\n          "scale": 1200, "translate": [450, 280],\n          "lon": "longitude", "lat": "latitude"\n        },\n        {\n          "type": "filter",\n          "test": "datum.traffic && datum.layout_x != null && datum.layout_y != null"\n        },\n        { "type": "sort", "by": "-traffic.flights" },\n        { "type": "voronoi", "x": "layout_x", "y": "layout_y" }\n      ]\n    },\n    {\n      "name": "routes",\n      "url": "data/flights-airport.csv",\n      "format": {"type": "csv", "parse": "auto"},\n      "transform": [\n        { "type": "filter", "test": "hover && hover.iata == datum.origin" },\n        {\n          "type": "lookup", "on": "airports", "onKey": "iata",\n          "keys": ["origin", "destination"], "as": ["_source", "_target"]\n        },\n        { "type": "filter", "test": "datum._source && datum._target" },\n        { "type": "linkpath", "shape": "line" }\n      ]\n    }\n  ],\n\n  "scales": [\n    {\n      "name": "size",\n      "type": "linear",\n      "domain": {"data": "traffic", "field": "flights"},\n      "range": [16, 1000]\n    }\n  ],\n\n  "signals": [\n    {\n      "name": "hover", "init": null,\n      "streams": [\n        {"type": "@cell:mouseover", "expr": "datum"},\n        {"type": "@cell:mouseout", "expr": "null"}\n      ]\n    },\n    {\n      "name": "title", "init": "U.S. Airports, 2008",\n      "streams": [{\n        "type": "hover", \n        "expr": "hover ? hover.name + \' (\' + hover.iata + \')\' : \'U.S. Airports, 2008\'"\n      }]\n    }\n  ],\n\n  "marks": [\n    {\n      "type": "path",\n      "from": {"data": "states"},\n      "properties": {\n        "enter": {\n          "path": {"field": "layout_path"},\n          "fill": {"value": "#dedede"},\n          "stroke": {"value": "white"}\n        }\n      }\n    },\n    {\n      "type": "symbol",\n      "from": {"data": "airports"},\n      "properties": {\n        "enter": {\n          "x": {"field": "layout_x"},\n          "y": {"field": "layout_y"},\n          "size": {"scale": "size", "field": "traffic.flights"},\n          "fill": {"value": "steelblue"},\n          "fillOpacity": {"value": 0.8},\n          "stroke": {"value": "white"},\n          "strokeWidth": {"value": 1.5}\n        }\n      }\n    },\n    {\n      "type": "path",\n      "name": "cell",\n      "from": {"data": "airports"},\n      "properties": {\n        "enter": {\n          "path": {"field": "layout_path"},\n          "fill": {"value": "transparent"}\n        }\n      }\n    },\n    {\n      "type": "path",\n      "interactive": false,\n      "from": {"data": "routes"},\n      "properties": {\n        "enter": {\n          "path": {"field": "layout_path"},\n          "stroke": {"value": "black"},\n          "strokeOpacity": {"value": 0.35}\n        }\n      }\n    },\n    {\n      "type": "text",\n      "interactive": false,\n      "properties": {\n        "enter": {\n          "x": {"value": 895},\n          "y": {"value": 0},\n          "fill": {"value": "black"},\n          "fontSize": {"value": 20},\n          "align": {"value": "right"}\n        },\n        "update": {\n          "text": {"signal": "title"}\n        }\n      }\n    }\n  ]\n}'});
+</script></body></html>
