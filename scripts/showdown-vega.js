@@ -42,11 +42,11 @@ var vega = function(converter) {
 
 function vega_invoke(id, markdown) {
   // map vega spec / filename to JS string
-  var arg = markdown.trim()
+  var spec = '{source: \'' + markdown.trim()
     .replace(/'/g, '\\\'')
-    .replace(/\n/g, '\\n');
+    .replace(/\n/g, '\\n') + '\'}';
   // add call to create new vega component
-  return 'vg.component(\'#' + id + '\', \'' + arg + '\')';
+  return 'vg.embed(\'#' + id + '\',' + spec + ')';
 }
 
 module.exports = vega;

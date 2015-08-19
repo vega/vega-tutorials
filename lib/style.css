@@ -57,17 +57,17 @@ pre > code {
   border-radius: none;
 }
 
-.vega-component .vega-actions {
+.vega-embed .vega-actions {
   font-weight: 300;
   text-align: right;
   font-size: 12px;
 }
 
-.vega-component .vega-actions a {
+.vega-embed .vega-actions a {
   margin-left: 1em;
   visibility: hidden;
 }
 
-.vega-component:hover .vega-actions a {
+.vega-embed:hover .vega-actions a {
   visibility: visible;
 }

@@ -56,13 +56,13 @@
       "url": "data/flights-airport.csv",
       "format": {"type": "csv", "parse": "auto"},
       "transform": [
+        { "type": "filter", "test": "hover && hover.iata == datum.origin" },
         {
           "type": "lookup", "on": "airports", "onKey": "iata",
           "keys": ["origin", "destination"], "as": ["_source", "_target"]
         },
         { "type": "filter", "test": "datum._source && datum._target" },
-        { "type": "linkpath", "shape": "line" },
-        { "type": "filter", "test": "hover && hover.iata == datum.origin" }
+        { "type": "linkpath", "shape": "line" }
       ]
     }
   ],
@@ -1294,18 +1294,18 @@ Adding hover-sensitive filtering is now quite easy:
   "url": "data/flights-airport.csv",
   "format": {"type": "csv", "parse": "auto"},
   "transform": [
+    { "type": "filter", "test": "hover && hover.iata == datum.origin" },
     {
       "type": "lookup", "on": "airports", "onKey": "iata",
       "keys": ["origin", "destination"], "as": ["_source", "_target"]
     },
     { "type": "filter", "test": "datum._source && datum._target" },
-    { "type": "linkpath", "shape": "line" },
-    { "type": "filter", "test": "hover && hover.iata == datum.origin" }
+    { "type": "linkpath", "shape": "line" }
   ]
 }
 ```
 
-We already have a `hover` signal set up to track the data associated with the currently selected airport. We just need to add a `filter` transform to our `routes` data: the `filter` keeps only those routes whose `origin` matches the selected airport. In addition, we increase the path `strokeOpacity` to `0.35` to be a bit more opaque.
+We already have a `hover` signal set up to track the data associated with the currently selected airport. We just need to add a `filter` transform to our `routes` data: the new `filter` at the beginning of the transform list keeps only those routes whose `origin` matches the selected airport. In addition, we increase the path `strokeOpacity` to `0.35` to be a bit more opaque.
 
 ```!vega
 {
@@ -1362,13 +1362,13 @@ We already have a `hover` signal set up to track the data associated with the cu
       "url": "data/flights-airport.csv",
       "format": {"type": "csv", "parse": "auto"},
       "transform": [
+        { "type": "filter", "test": "hover && hover.iata == datum.origin" },
         {
           "type": "lookup", "on": "airports", "onKey": "iata",
           "keys": ["origin", "destination"], "as": ["_source", "_target"]
         },
         { "type": "filter", "test": "datum._source && datum._target" },
-        { "type": "linkpath", "shape": "line" },
-        { "type": "filter", "test": "hover && hover.iata == datum.origin" }
+        { "type": "linkpath", "shape": "line" }
       ]
     }
   ],
@@ -1581,13 +1581,13 @@ Here we simply replace `symbol:` with `@cell:`. The `@name` pattern selects only
       "url": "data/flights-airport.csv",
       "format": {"type": "csv", "parse": "auto"},
       "transform": [
+        { "type": "filter", "test": "hover && hover.iata == datum.origin" },
         {
           "type": "lookup", "on": "airports", "onKey": "iata",
           "keys": ["origin", "destination"], "as": ["_source", "_target"]
         },
         { "type": "filter", "test": "datum._source && datum._target" },
-        { "type": "linkpath", "shape": "line" },
-        { "type": "filter", "test": "hover && hover.iata == datum.origin" }
+        { "type": "linkpath", "shape": "line" }
       ]
     }
   ],
