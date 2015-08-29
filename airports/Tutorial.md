@@ -39,13 +39,17 @@
           "keys": ["iata"], "as": ["traffic"]
         },
         {
+          "type": "filter",
+          "test": "datum.traffic != null"
+        },
+        {
           "type": "geo", "projection": "albersUsa",
           "scale": 1200, "translate": [450, 280],
           "lon": "longitude", "lat": "latitude"
         },
         {
           "type": "filter",
-          "test": "datum.traffic && datum.layout_x != null && datum.layout_y != null"
+          "test": "datum.layout_x != null && datum.layout_y != null"
         },
         { "type": "sort", "by": "-traffic.flights" },
         { "type": "voronoi", "x": "layout_x", "y": "layout_y" }
@@ -355,7 +359,7 @@ Now we can plot the airports over our map. We can load the airport data by addin
 
 Here we use the `format` property to indicate that this is `csv` data and that we should `auto` parse the data values. Vega will automatically try to determine which columns are numbers, which are strings, and so on.
 
-To plot the data, we then need to project the `longitude` and `latitude` variables to x, y coordinates. Here we use the `geo` transform with projection settings identical to our earlier `geopath` transform:
+To plot the data, we then need to project the `longitude` and `latitude` variables to x and y coordinates. Here we use the `geo` transform with projection settings identical to our earlier `geopath` transform:
 
 ```json
 {
@@ -376,7 +380,7 @@ To plot the data, we then need to project the `longitude` and `latitude` variabl
 }
 ```
 
-In addition, we add a `filter` transfrom to remove any data points with null coordinates. In this case, airports outside the 50 states and Washington D.C. (such as those in U.S. territories) are not supported by the `albersUsa` projection. The projection returns `null` x and y values for those airports.
+In addition, we add a `filter` transform to remove any data points with null coordinates. In this case, airports outside the 50 states and Washington D.C. (such as those in U.S. territories) are not supported by the `albersUsa` projection. The projection returns `null` x and y values for those airports.
 
 To visualize the airports, we add a new `symbol` mark entry to the `marks` array:
 
@@ -507,12 +511,16 @@ Now that we have a measure of per-airport traffic, we would like to combine (or 
       "keys": ["iata"], "as": ["traffic"]
     },
     {
+      "type": "filter",
+      "test": "datum.traffic != null"
+    },
+    {
       "type": "geo", "projection": "albersUsa",
       "lon": "longitude", "lat": "latitude"
     },
     {
       "type": "filter",
-      "test": "datum.traffic && datum.layout_x != null && datum.layout_y != null"
+      "test": "datum.layout_x != null && datum.layout_y != null"
     }
   ]
 }
@@ -520,7 +528,7 @@ Now that we have a measure of per-airport traffic, we would like to combine (or 
 
 Here the `airports` data is our primary dataset and the `traffic` data is used as the lookup table. For each airport, we look for a record in the traffic data whose `origin` property matches the `iata` property of the airport. If a match is found, we add the traffic record to the airport data under a property named `traffic`.
 
-We also update our `filter` transform to remove airports for which we fail to find a match in the traffic dataset (indicated by a `null` value). This step filters out all the airports for which we observe no originating flights in 2008.
+We also add a new `filter` transform to remove airports for which we fail to find a match in the traffic dataset (indicated by a `null` value). This step filters out all the airports for which we observe no originating flights in 2008. Though we could combine the filter criteria into a single filter instance, here we filter out the extraneous airports up front so that we don't waste time needlessly computing geo-coordinates.
 
 ```!vega
 {
@@ -561,13 +569,17 @@ We also update our `filter` transform to remove airports for which we fail to fi
           "keys": ["iata"], "as": ["traffic"]
         },
         {
+          "type": "filter",
+          "test": "datum.traffic != null"
+        },
+        {
           "type": "geo", "projection": "albersUsa",
           "scale": 1200, "translate": [450, 280],
           "lon": "longitude", "lat": "latitude"
         },
         {
           "type": "filter",
-          "test": "datum.traffic && datum.layout_x != null && datum.layout_y != null"
+          "test": "datum.layout_x != null && datum.layout_y != null"
         }
       ]
     }
@@ -685,13 +697,17 @@ Here we modify our airport `symbol` marks. The `size` property is now set by run
           "keys": ["iata"], "as": ["traffic"]
         },
         {
+          "type": "filter",
+          "test": "datum.traffic != null"
+        },
+        {
           "type": "geo", "projection": "albersUsa",
           "scale": 1200, "translate": [450, 280],
           "lon": "longitude", "lat": "latitude"
         },
         {
           "type": "filter",
-          "test": "datum.traffic && datum.layout_x != null && datum.layout_y != null"
+          "test": "datum.layout_x != null && datum.layout_y != null"
         }
       ]
     }
@@ -764,7 +780,7 @@ While we can see differences between airports, it would be nice to see their nam
 ]
 ```
 
-_Signals_ are variables that can change dynamically in response to user input. Each signal consists of a name, an initial value, and an optional set of one or more update rules. The update rules are defined as a set of `streams` handlers with a `type` (which may monitor input event patterns or other signals) and an expression (`expr`) to evaluate when events occur.
+_Signals_ are variables that can change dynamically in response to user input. Each signal consists of a name, an initial value, and an optional set of one or more update rules. The update rules are defined as a set of `streams` handlers with a `type` (which may monitor input event patterns or other signals) and an expression (`expr`) to evaluate when events occur. To learn more about expressions, see the [Vega expression language documentation](https://github.com/vega/vega/wiki/Expressions).
 
 The `hover` signal contains the current airport record (or `datum`) under the mouse cursor, or `null` if no airport is being hovered over. The `streams` entries state that upon `mousover` of a `symbol` mark, set the signal value to the current `datum`. Upon a `mouseout` event, set the signal value to `null`. In short, this signal tracks the data of the currently hovered symbol.
 
@@ -840,13 +856,17 @@ To fix the problem, we can add `25` pixels of padding to the `top` of the visual
           "keys": ["iata"], "as": ["traffic"]
         },
         {
+          "type": "filter",
+          "test": "datum.traffic != null"
+        },
+        {
           "type": "geo", "projection": "albersUsa",
           "scale": 1200, "translate": [450, 280],
           "lon": "longitude", "lat": "latitude"
         },
         {
           "type": "filter",
-          "test": "datum.traffic && datum.layout_x != null && datum.layout_y != null"
+          "test": "datum.layout_x != null && datum.layout_y != null"
         }
       ]
     }
@@ -942,12 +962,16 @@ Notice any problems with our visualization? Take a look at Chicago: O'Hare compl
       "keys": ["iata"], "as": ["traffic"]
     },
     {
+      "type": "filter",
+      "test": "datum.traffic != null"
+    },
+    {
       "type": "geo", "projection": "albersUsa",
       "lon": "longitude", "lat": "latitude"
     },
     {
       "type": "filter",
-      "test": "datum.traffic && datum.layout_x != null && datum.layout_y != null"
+      "test": "datum.layout_x != null && datum.layout_y != null"
     },
     { "type": "sort", "by": "-traffic.flights" }
   ]
@@ -995,13 +1019,17 @@ We now add a `sort` transform to the `airports` data, ordering by traffic. The m
           "keys": ["iata"], "as": ["traffic"]
         },
         {
+          "type": "filter",
+          "test": "datum.traffic != null"
+        },
+        {
           "type": "geo", "projection": "albersUsa",
           "scale": 1200, "translate": [450, 280],
           "lon": "longitude", "lat": "latitude"
         },
         {
           "type": "filter",
-          "test": "datum.traffic && datum.layout_x != null && datum.layout_y != null"
+          "test": "datum.layout_x != null && datum.layout_y != null"
         },
         { "type": "sort", "by": "-traffic.flights" }
       ]
@@ -1171,13 +1199,17 @@ We set the `interactive` property false to prevent the links from interfering wi
           "keys": ["iata"], "as": ["traffic"]
         },
         {
+          "type": "filter",
+          "test": "datum.traffic != null"
+        },
+        {
           "type": "geo", "projection": "albersUsa",
           "scale": 1200, "translate": [450, 280],
           "lon": "longitude", "lat": "latitude"
         },
         {
           "type": "filter",
-          "test": "datum.traffic && datum.layout_x != null && datum.layout_y != null"
+          "test": "datum.layout_x != null && datum.layout_y != null"
         },
         { "type": "sort", "by": "-traffic.flights" }
       ]
@@ -1346,13 +1378,17 @@ We already have a `hover` signal set up to track the data associated with the cu
           "keys": ["iata"], "as": ["traffic"]
         },
         {
+          "type": "filter",
+          "test": "datum.traffic != null"
+        },
+        {
           "type": "geo", "projection": "albersUsa",
           "scale": 1200, "translate": [450, 280],
           "lon": "longitude", "lat": "latitude"
         },
         {
           "type": "filter",
-          "test": "datum.traffic && datum.layout_x != null && datum.layout_y != null"
+          "test": "datum.layout_x != null && datum.layout_y != null"
         },
         { "type": "sort", "by": "-traffic.flights" }
       ]
@@ -1478,12 +1514,16 @@ To do so, we can create a [Voronoi diagram](https://en.wikipedia.org/wiki/Vorono
       "keys": ["iata"], "as": ["traffic"]
     },
     {
+      "type": "filter",
+      "test": "datum.traffic != null"
+    },
+    {
       "type": "geo", "projection": "albersUsa",
       "lon": "longitude", "lat": "latitude"
     },
     {
       "type": "filter",
-      "test": "datum.traffic && datum.layout_x != null && datum.layout_y != null"
+      "test": "datum.layout_x != null && datum.layout_y != null"
     },
     { "type": "sort", "by": "-traffic.flights" },
     { "type": "voronoi", "x": "layout_x", "y": "layout_y" }
@@ -1564,13 +1604,17 @@ Here we simply replace `symbol:` with `@cell:`. The `@name` pattern selects only
           "keys": ["iata"], "as": ["traffic"]
         },
         {
+          "type": "filter",
+          "test": "datum.traffic != null"
+        },
+        {
           "type": "geo", "projection": "albersUsa",
           "scale": 1200, "translate": [450, 280],
           "lon": "longitude", "lat": "latitude"
         },
         {
           "type": "filter",
-          "test": "datum.traffic && datum.layout_x != null && datum.layout_y != null"
+          "test": "datum.layout_x != null && datum.layout_y != null"
         },
         { "type": "sort", "by": "-traffic.flights" },
         { "type": "voronoi", "x": "layout_x", "y": "layout_y" }
