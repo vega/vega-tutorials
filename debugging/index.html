@@ -1,0 +1,130 @@
+<!DOCTYPE html><html><head><title>Vega Tutorial: Debugging</title><link rel="stylesheet" href="../style.css"><link rel="stylesheet" href="../highlight.css"><script src="http://vega.github.io/vega-editor/vendor/topojson.js" charset="utf-8"></script><script src="http://vega.github.io/vega-editor/vendor/d3.min.js" charset="utf-8"></script><script src="http://vega.github.io/vega-editor/vendor/d3.geo.projection.min.js" charset="utf-8"></script><script src="http://vega.github.io/vega-editor/vendor/d3.layout.cloud.js" charset="utf-8"></script><script src="http://vega.github.io/vega-editor/vendor/vega.min.js" charset="utf-8"></script><script src="http://vega.github.io/vega-editor/vendor/vega-embed.min.js" charset="utf-8"></script><script src="../highlight.min.js"></script><script>hljs.initHighlightingOnLoad();</script><script>vg.embed.config.source_header = '\<link rel="stylesheet" href="../highlight.css"\>\<script src="../highlight.min.js"\>\</script\>';vg.embed.config.source_footer = '\<script\>hljs.initHighlighting();\</script\>';</script></head><body><h1 id="debuggingvega">Debugging Vega</h1>
+
+<p>The online Vega editor contains debugging tools to help you develop visualizations. These tools are available by clicking the <img src="figures/debug.png" alt="Debug" width="16"/> symbol. Opening the debugging tools opens a new panel at the bottom of the specification area. The debugging tools include three components: a <strong>timeline</strong> of signals, <strong>visualization annotations</strong>, and <strong>dynamic data tables</strong>.</p>
+
+<p>In this tutorial, we show example debugging outputs from three visualizations from the <a href="http://vega.github.io/vega-editor">online Vega Editor</a>: <code>index_chart</code>, <code>linking</code>, <code>panzoom_points</code>. We highly encourage your to try out the various debugging techniques alongside this tutorial.</p>
+
+<h2 id="signaltimelineandreplay">Signal Timeline and Replay</h2>
+
+<p>The signal timeline automatically tracks updates to signal values during interaction and supports replay to previous timesteps of the visualization. The timeline is initialized with all signals defined in the specification and updates automatically as you interact. The timeline contains a number of different components:</p>
+
+<ul>
+<li>Overview - the number of signals updated in each timestep</li>
+
+<li>Timeline - the values of signals at each timestep</li>
+
+<li>Signal Names - selecting a signal name highlights all occurrences of it in the specification</li>
+
+<li>Cursor - the cursor line shows the current timestep</li>
+
+<li>Signal Values - the values of each signal at the current timestep as indicated by the cursor</li>
+</ul>
+
+<p><img src="figures/timeline.png" alt="Signal Timeline" width=100%/></p>
+
+<h3 id="overview">Overview</h3>
+
+<p>The height of each bar in the overview shows the number of signals that are updated in a given timestep of the interaction. The currently selected signal value is colored in green. Dragging along the overview filters the timeline to show only the highlighted timesteps. The overview can be useful for identifying trends in the interaction and identifying points of interest:</p>
+
+<p>In the <code>index_chart</code> visualization, there is only one consistent form of interaction: <code>mousemove</code>.</p>
+
+<p><img src="figures/overview-index_chart.png" alt="Overview - Consistent Interaction" width=100%/></p>
+
+<p>Brushes have a distinct pattern: one timestep for initializing the <code>brush_start</code> and <code>brush_end</code> signals and many timesteps that update <code>brush_end</code>. In the <code>linking</code> visualization, you can brush different cells of the visualization; brushing the same cell as the previous interaction has a slightly different interaction signature.</p>
+
+<p><img src="figures/overview-linking.png" alt="Overview - Brushing" width=100%/></p>
+
+<p>In the <code>panzoom_points</code> visualization, there are many interactions that are recorded, each with a different pattern. On <code>mousemove</code> only the <code>xAnchor</code> and <code>yAnchor</code> signals are updated. While panning, updates to the <code>Min</code>/<code>Max</code> signals are interleaved with updates to the <code>Anchor</code> signals. While zooming, the <code>zoom</code>, <code>xs</code>, and <code>ys</code> update in addition to the <code>Min</code>/<code>Max</code> signals from the panning interaction. The difference in the number of signals updated at each timestep creates different interaction signatures in the overview.</p>
+
+<p><img src="figures/overview-panzoom_points.png" alt="Overview - Many Interactions" width=100%/></p>
+
+<h3 id="timeline">Timeline</h3>
+
+<p>Each time a signal is updated a box is added to the timeline to represent the new value. The cursor indicates the current timestep of the visualization (with the currently selected signal in dark green); light green shows the value of each signal relative to the currently selected point. The signal values for the current timestep are shown on the right using the same color scheme.</p>
+
+<p><img src="figures/timeline-linking.png" alt="Signal Timeline" width=100%/></p>
+
+<p>In this case, the <code>linking</code> visualization has been replayed to the middle of one of the brushing interactions. The current value of <code>start_coords</code> is <code>{"x": 41, "y": 26}</code> which was initialized at the start of the brush and hasn't been updated since. The <code>end_coords</code> signal updates as your drag out the brush; the value at the current timestep of replay is <code>{"x": 85, "y": 78}</code>. The last signal to be updated in this timestep was the <code>brush</code> signal, which extracts the <code>x</code> and <code>y</code> values from <code>start_coords</code> and <code>end_coords</code> to determine the absolute pixel values for the brush based on which <code>cell</code> it was drawn in.</p>
+
+<pre><code class="json language-json">{
+  "name": "brush",
+  "init": {"x1": 0, "y1": 0, "x2": 0, "y2": 0},
+  "streams": [{
+    "type": "start_coords, end_coords",
+    "expr": "{x1: cell.x + start_coords.x, y1: cell.y + start_coords.y, x2: cell.x + end_coords.x, y2: cell.y + end_coords.y}"
+  }]
+}
+</code></pre>
+
+<p>As shown here, signals may be used in the definition of other signals in the specification. Hovering over a signal value in the timeline shows the <strong>dependencies</strong> of that value. As you can see here, the <code>brush</code> signal uses the values of <code>start_coords</code>, <code>end_coords</code>, and <code>cell</code> to compute the resulting value of the signal. The exact values that are used are highlighted with a red border. Hovering over a signal value in the timeline also shows the value as a tooltip in the overview.</p>
+
+<p><img src="figures/dependencies-linking.gif" alt="Signal Dependencies" width=100%/></p>
+
+<p>Signals may also include a scale property that applies a scale transformation to the stream expression. The timeline shows the transformed signal value in the right-hand column; hovering over the value shows the original input from the stream along with the transformation. In the <code>panzoom_points</code> visualization, a scale transformation is used on the <code>yAnchor</code> signal to transform the resulting pixel from <code>mousemove</code> into the appropriate data value:</p>
+
+<pre><code class="json language-json">{
+  "name": "yAnchor",
+  "init": 0,
+  "streams": [{
+    "type": "mousemove",
+    "expr": "eventY()",
+    "scale": {"name":"y", "invert":true}
+  }]
+}
+</code></pre>
+
+<p><img src="figures/tooltip-panzoom_points.gif" alt="Scale Transformation Tooltip" width=100%/></p>
+
+<h3 id="replay">Replay</h3>
+
+<p>Replaying to a previous timestep updates the timeline and the visualization. When in replay mode, the visualization is grayed out and interactions are disabled. When replaying, you can also view <strong>visualization annotations</strong>. There are three ways to replay the visualization to a previous timestep:</p>
+
+<ol>
+<li>Select the pause (<img src="figures/pause.png" alt="Pause" width="16" align="center"/>) button on the debugging panel.</li>
+
+<li>Use your keyboard's arrow keys to navigate between timesteps of the visualization. <br> Left/Right arrows move between timesteps. <br> Up/Down arrows move between signal values within a given timestep.</li>
+
+<li>Select a signal value on the timeline to replay directly to that timestep.</li>
+</ol>
+
+<h2 id="visualizationannotations">Visualization Annotations</h2>
+
+<p><img src="figures/annotation.gif" alt="Visualization Annotation" width=30% align="left"/> When replaying the visualization, you can view relevant encodings as an annotation on the visualization. The annotation appears as a tooltip that shows all encodings that are parameterized by a scale transformation in the specification. The encodings shown in the annotation are relative to the current scope of the visualization, which can be particularly helpful for understanding the behavior of layered, stacked, or small multiple visualizations. For example, in the <code>linking</code> visualization the <code>gx</code> and <code>gy</code> scales determine the position of each cell in the scatterplot matrix. Within each cell, a different <code>x</code> and <code>y</code> scale determines the position of points. Finally, a top-level scale 'c' determines the color of highlighted points based on the species. When using the visualization annotation, it is easy to view the relevant encodings for the current cursor location. If there are no encodings on the visualization, the tooltip shows the <code>xy</code> pixel location (for example, see the <code>wordcloud</code> visualization).</p>
+
+<h2 id="dynamicdatatables">Dynamic Data Tables</h2>
+
+<p>The dynamic data tables show all the named datasets you define in the specification. These data tables are available for static visualizations as well as for debugging interactive visualizations. The data table contains a number of different components:</p>
+
+<ul>
+<li>Overview - augmented with the variability of the data attributes</li>
+
+<li>Data Tables - tabs for each named dataset</li>
+
+<li>Data Attributes - selecting the name of a data attribute highlights all occurrences in the specification</li>
+
+<li>Distribution - histograms of the distribution of attribute values</li>
+
+<li>Data Points - a row for each data point in the dataset (10 visible by default)</li>
+</ul>
+
+<p><img src="figures/datatable.png" alt="Dynamic Data Table" width=100%/></p>
+
+<h3 id="attributevariability">Attribute Variability</h3>
+
+<p>The data tables update as interactions occur; the line graph in the overview shows the variability of each attribute in the selected dataset. Hovering over the name of a data attribute shows the attribute variability for only that attribute. For a static dataset, the variability of all attributes is zero and appears as a flat line along the bottom of the visualization. In the <code>index_chart</code>, the <code>stocks</code> dataset is static: </p>
+
+<p><img src="figures/index_chart-stocks-datatable.gif" alt="Static Attribute Variability" width=100%/></p>
+
+<p>For a dynamic data table, the attribute variability shows the amount of change. The variability is defined as the difference in the distribution of the data between the current and previous timestep. In the <code>index_chart</code>, the <code>index</code> and <code>indexified_stocks</code> are modified as the you interact.</p>
+
+<p><img src="figures/index_chart-indexified_stocks-datatable.gif" alt="Dynamic Data Table" width=100%/></p>
+
+<p>The green bar and point show the current timestep of the replayed visualization. In the <code>index_chart</code> visualization, we see that there is a large spike in the variability of the <code>_id</code> attribute in the <code>index</code> dataset. This spike occurs after Google (GOOG) starts having values in the dataset (around August 2004). All timesteps in the interaction before this point only showed four companies, whereas all timesteps after this point have values for all five companies.</p>
+
+<p><img src="figures/index_chart-index-datatable.gif" alt="Dynamic Data Table" width=100%/></p>
+
+<h2 id="nextsteps">Next Steps</h2>
+
+<p>Now that you've reached the end of this tutorial, try out some of these techniques on your own visualizations or in the <a href="http://vega.github.io/vega-editor">online Vega Editor</a>! Are there other interaction patterns you can identify with the overview? How interdependent are the signals? What datasets are transformed the most during interaction? How are scales used to encode different visualization elements?</p>
+<script>
+</script></body></html>
