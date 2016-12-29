@@ -199,7 +199,7 @@ iata,name,city,state,country,latitude,longitude
 01G,Perry-Warsaw,Perry,NY,USA,42.74134667,-78.05208056
 ```
 
-**[flights-airport.csv](data/airports.csv)**
+**[flights-airport.csv](data/flights-airport.csv)**
 
 This data set contains flight information for the year 2008. Each record consists of an `origin` airport (identified by IATA id), a `destination` airport, and the `count` of flights along this route. We will use this dataset to compute per-airport traffic and to plot connections among airports.
 
